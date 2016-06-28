@@ -25,7 +25,6 @@ postconf -e "authorized_flush_users = root, nagios, postfix"
 
 This will also limit access to the mailq-commands.
 
-
 central usage)
 postfixauth can run on a central network machine and therefore will build a
 map with a key concating the user-name and the clients ip addresses.
@@ -36,3 +35,16 @@ with nohup, a systemd starter file, screen, supervisord.
 
 It is also lazy and only purges old map entries, when the user is sending more
 mails.
+
+try out)
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+postdrop: fatal: User web87(1467) is not allowed to submit mail
+
+mail.log:
+Jun 20 07:45:12 my01 postfix/postdrop[5611]: fatal: User web87(1431) is not allowed to submit mail
+
