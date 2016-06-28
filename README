@@ -19,7 +19,7 @@ setup postfix configuration:
 You need tell postfix to connect to the socket and ask for the sending permission.
 E.g. on my systems I use something like this:
 
-postconf -e "authorized_submit_users = tcp:localhost:843"
+postconf -e "authorized_submit_users = tcp:localhost:8443"
 postconf -e "authorized_mailq_users = root, nagios, postfix"
 postconf -e "authorized_flush_users = root, nagios, postfix"
 
