@@ -40,9 +40,8 @@ func handleConnection(pConn net.Conn)  {
 		return
 	}
 
-	user = strings.TrimSuffix(user, "\r")
 	user = strings.TrimSuffix(user, "\n")
-	user = strings.TrimPrefix(user, "GET ");
+	user = strings.TrimPrefix(user, "get ");
 
 	if utf8.RuneCountInString(user) == 0  {
 		fmt.Fprint(pConn, postfixErrFmt)
