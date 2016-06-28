@@ -1,0 +1,3 @@
+- Background thread for purging timed-out map entries
+- more logging (syslog)
+- daemonize or example script
