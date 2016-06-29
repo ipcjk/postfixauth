@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+	"os"
 )
 
 /* Defaults, allow mailCounter in durationCounter */
@@ -61,7 +62,7 @@ func handlePolicyConnection(pConn net.Conn) {
 	sawRequest := false
 
 	defer pConn.Close()
-	/* Client IP-Adress */
+
 	host, _, err := net.SplitHostPort(pConn.RemoteAddr().String())
 	if err != nil {
 		fmt.Println("Cant read ip and port", err.Error())
@@ -85,7 +86,6 @@ func handlePolicyConnection(pConn net.Conn) {
 		return
 	}
 
-	/* Default */
 	fmt.Fprint(pConn, postfixDefaultFmt)
 	return
 }
@@ -118,7 +118,7 @@ func handleSendmailConnection(pConn net.Conn) {
 
 }
 
-func listenSendMail() {
+func listenSendMail(wg *sync.WaitGroup) {
 	ln, err := net.Listen("tcp", *hostPortSendmail)
 	if err != nil {
 		log.Fatal(err)
@@ -133,9 +133,10 @@ func listenSendMail() {
 			go handleSendmailConnection(conn)
 		}
 	}
+	wg.Done()
 }
 
-func listenPolicy() {
+func listenPolicy(wg *sync.WaitGroup) {
 	ln, err := net.Listen("tcp", *hostPortPolicy)
 	if err != nil {
 		log.Fatal(err)
@@ -150,15 +151,19 @@ func listenPolicy() {
 			go handlePolicyConnection(conn)
 		}
 	}
+	wg.Done()
 }
 
 func main() {
 	flag.Parse()
+	var wg sync.WaitGroup
+	wg.Add(2)
 
 	/* Create sendmail and policy-connector  */
-	go listenPolicy()
-	go listenSendMail()
+	go listenPolicy(&wg)
+	go listenSendMail(&wg)
 
-	select {}
-	// os.Exit(0)
+	wg.Wait();
+	//select {}
+	os.Exit(0)
 }
