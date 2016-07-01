@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
-	"os"
-	"runtime"
 )
 
 /* Defaults, allow mailCounter in durationCounter */
@@ -22,6 +22,8 @@ var hostPortSendmail = flag.String("bindSendmail", "localhost:9443", "ip and por
 var hostPortPolicy = flag.String("bindPolicy", "localhost:8443", "ip and port for the listening socket for policy-connections")
 var mailCounter = flag.Int("c", 10, "allowed numbers of mail during duration")
 var durationCounter = flag.Int64("t", 60, "duration for the allowed number of mails")
+var RunSendmail = flag.Bool("rm", false, "Run Sendmail policy")
+var RunSASLpolicy = flag.Bool("rs", false, "Run SASL policyd")
 
 /* String Formats */
 var postfixOkFmt string = "200 OK (%d)\n"
@@ -119,8 +121,8 @@ func handleSendmailConnection(pConn net.Conn) {
 
 }
 
-func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string ) {
-	defer 	wg.Done()
+func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
+	defer wg.Done()
 
 	ln, err := net.Listen("tcp", AddrPort)
 	if err != nil {
@@ -138,19 +140,23 @@ func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string ) {
 	}
 }
 
-
 func main() {
 	runtime.GOMAXPROCS(2)
 	var wg sync.WaitGroup
 
 	flag.Parse()
-	wg.Add(2)
 
 	/* Create sendmail and policy-connector  */
-	go listenPort(&wg, handlePolicyConnection, *hostPortPolicy )
-	go listenPort(&wg, handleSendmailConnection, *hostPortSendmail)
+	if *RunSendmail == true {
+		go listenPort(&wg, handleSendmailConnection, *hostPortSendmail)
+		wg.Add(1)
+	}
+	if *RunSASLpolicy == true {
+		go listenPort(&wg, handlePolicyConnection, *hostPortPolicy)
+		wg.Add(1)
+	}
 
 	/* Wait for both threads to end */
-	wg.Wait();
+	wg.Wait()
 	os.Exit(0)
 }
