@@ -5,8 +5,11 @@ package main
 
 import (
 	"bufio"
+	"database/sql"
+	_ "database/sql/driver"
 	"flag"
 	"fmt"
+	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net"
 	"os"
@@ -40,7 +43,11 @@ var mu sync.Mutex
 /* uMC = userMailCounter */
 var uMC = make(map[string][]time.Time)
 
+/* sMC = staticMailCounters read by sql driver */
+var sMC = make(map[string]int)
+
 func handleUserLimit(userHost string) string {
+	var personalMailLimit int
 	mu.Lock()
 	newSlice := make([]time.Time, 0, 15)
 
@@ -52,7 +59,16 @@ func handleUserLimit(userHost string) string {
 	uMC[userHost] = newSlice
 	mu.Unlock()
 
-	if len(uMC[userHost]) > *mailCounter {
+	fmt.Println(userHost)
+	personalMailLimit = *mailCounter
+	_, ok  := sMC[userHost]
+	if ok == true {
+		personalMailLimit = sMC[userHost]
+		fmt.Println("found user " + userHost)
+		fmt.Printf("Setting limit to %d\n", personalMailLimit)
+	}
+
+	if len(uMC[userHost]) > personalMailLimit {
 		return fmt.Sprintf(postfixErrFmt)
 	} else {
 		uMC[userHost] = append(uMC[userHost], time.Now())
@@ -140,13 +156,31 @@ func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
 	}
 }
 
+func scanUserLimits() {
+	/* open connection to db */
+	db, err := sql.Open("sqlite3", "./ratepolicy.db")
+	checkErr(err)
+
+	rows, err := db.Query("SELECT sasl_username, sasl_limit FROM rate_sasl_user_limits")
+	checkErr(err)
+	for rows.Next() {
+		var sasl_username string
+		var sasl_limit int
+		err = rows.Scan(&sasl_username, &sasl_limit)
+		checkErr(err)
+		sMC[sasl_username] = sasl_limit
+	}
+	db.Close()
+}
+
 func main() {
 	runtime.GOMAXPROCS(2)
 	var wg sync.WaitGroup
 
 	flag.Parse()
+	scanUserLimits()
 
-	/* Create sendmail and policy-connector  */
+	/* Create send mail and policy-connector  */
 	if *RunSendmail == true {
 		go listenPort(&wg, handleSendmailConnection, *hostPortSendmail)
 		wg.Add(1)
@@ -159,4 +193,10 @@ func main() {
 	/* Wait for both threads to end */
 	wg.Wait()
 	os.Exit(0)
+}
+
+func checkErr(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
