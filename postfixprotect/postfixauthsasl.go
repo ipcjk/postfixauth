@@ -36,7 +36,7 @@ var durationCounter int64
 var postfixOkFmt string = "200 OK (%d)\n"
 var postfixErrFmt string = "500 Limit reached\n"
 var postfixDefaultFmt string = "DUNNO default\n"
-var postfixSaslUsername = "sasl_username="
+var postfixPolicyUsername = "sasl_username="
 var postfixPolicyRequest = "request="
 
 /* Mutex for map-access */
@@ -99,8 +99,8 @@ func handlePolicyConnection(pConn net.Conn) {
 		if strings.HasPrefix(scanner.Text(), postfixPolicyRequest) {
 			sawRequest = true
 			continue
-		} else if strings.HasPrefix(scanner.Text(), postfixSaslUsername) {
-			sasl_username = strings.Trim(scanner.Text(), postfixSaslUsername)
+		} else if strings.HasPrefix(scanner.Text(), postfixPolicyUsername) {
+			sasl_username = strings.Trim(scanner.Text(), postfixPolicyUsername)
 		} else if utf8.RuneCountInString(scanner.Text()) == 0 {
 			break
 		}
@@ -211,7 +211,7 @@ func load_config() {
 
 	durationCounter = cfg.Section("general").Key("duration").MustInt64(60)
 	mailCounter = cfg.Section("general").Key("mailCounter").MustInt(10)
-	*DEBUG = cfg.Section("general").Key("BOOL").MustBool(true)
+	*DEBUG = cfg.Section("general").Key("debug").MustBool(true)
 
 	/* connect db and load blacklist database if necessary */
 	hash := cfg.Section("blacklist_db").KeysHash()
