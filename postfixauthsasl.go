@@ -20,22 +20,22 @@ import (
 	"unicode/utf8"
 )
 
-/* Defaults, allow mailCounter in durationCounter, can be overwritten by config file */
+/* Flags and argv parser */
 var DEBUG = flag.Bool("debug", false, "Debug outputs")
-var hostPortSendmail = flag.String("bindSendmail", "localhost:9443", "ip and port for the listening socket for sendmail auth user requests")
-var hostPortPolicy = flag.String("bindPolicy", "localhost:8443", "ip and port for the listening socket for policy-connections")
-var mailCounter = flag.Int("c", 10, "allowed numbers of mail during duration")
-var durationCounter = flag.Int64("t", 60, "duration for the allowed number of mails")
-var RunSendmail = flag.Bool("rm", false, "Run Sendmail policy")
-var RunSASLpolicy = flag.Bool("rs", false, "Run SASL policyd")
 var configFile = flag.String("config", "postfixauthsasl.ini", "path to our configuration")
+var listenPortSendmail = flag.String("bindSendmail", "localhost:9443", "ip and port for the listening socket for sendmail auth user requests")
+var listenPortPolicy = flag.String("bindPolicy", "localhost:8443", "ip and port for the listening socket for policy-connections")
+var RunSendmailProtect = flag.Bool("sendmailprotect", false, "Run Sendmail policyd")
+var RunSASLpolicyd = flag.Bool("saslprotect", false, "Run SASL policyd")
 
-/* String Formats */
+/* Globals */
+var mailCounter int
+var durationCounter int64
+
+/* Postfix strings */
 var postfixOkFmt string = "200 OK (%d)\n"
 var postfixErrFmt string = "500 Limit reached\n"
 var postfixDefaultFmt string = "DUNNO default\n"
-
-/* policyd-search */
 var postfixSaslUsername = "sasl_username="
 var postfixPolicyRequest = "request="
 
@@ -48,7 +48,7 @@ var uMC = make(map[string][]time.Time)
 /* sMC = staticMailCounters read by sql driver */
 var sMC = make(map[string]int)
 
-/* blacklistedsenderDomains = blacklistDomains read by sql driver */
+/* blacklisted senderDomains = blacklistDomains read by sql driver */
 var bMC = make(map[string]bool)
 
 func handleUserLimit(userHost string) string {
@@ -57,20 +57,21 @@ func handleUserLimit(userHost string) string {
 	newSlice := make([]time.Time, 0, 15)
 
 	for i := 0; i < len(uMC[userHost]); i++ {
-		if int64(time.Since(uMC[userHost][i])/time.Second) < *durationCounter {
+		if int64(time.Since(uMC[userHost][i])/time.Second) < durationCounter {
 			newSlice = append(newSlice, uMC[userHost][i])
 		}
 	}
 	uMC[userHost] = newSlice
 	mu.Unlock()
 
-	fmt.Println(userHost)
-	personalMailLimit = *mailCounter
+	personalMailLimit = mailCounter
 	_, ok := sMC[userHost]
 	if ok == true {
 		personalMailLimit = sMC[userHost]
-		fmt.Println("found user " + userHost)
-		fmt.Printf("Setting limit to %d\n", personalMailLimit)
+		if *DEBUG == true {
+			fmt.Println("found user " + userHost)
+			fmt.Printf("Setting limit to %d\n", personalMailLimit)
+		}
 	}
 
 	if len(uMC[userHost]) > personalMailLimit {
@@ -159,13 +160,13 @@ func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
 	}
 }
 
-func load_blacklist(dbsection map[string]string) {
-	db, err := sql.Open(dbsection["driver"], dbsection["dsn"])
+func load_blacklist(section map[string]string) {
+	db, err := sql.Open(section["driver"], section["dsn"])
 	defer db.Close()
 
 	checkErr(err)
 
-	rows, err := db.Query(dbsection["q"])
+	rows, err := db.Query(section["q"])
 	checkErr(err)
 	for rows.Next() {
 		var domain string
@@ -180,13 +181,13 @@ func load_blacklist(dbsection map[string]string) {
 	}
 }
 
-func load_userlimits(dbsection map[string]string) {
-	db, err := sql.Open(dbsection["driver"], dbsection["dsn"])
+func load_userlimits(section map[string]string) {
+	db, err := sql.Open(section["driver"], section["dsn"])
 	defer db.Close()
 
 	checkErr(err)
 
-	rows, err := db.Query(dbsection["q"])
+	rows, err := db.Query(section["q"])
 	checkErr(err)
 	for rows.Next() {
 		var sasl_username string
@@ -208,8 +209,8 @@ func load_config() {
 	cfg, err := ini.Load(*configFile)
 	checkErr(err)
 
-	*durationCounter = cfg.Section("general").Key("duration").MustInt64(60)
-	*mailCounter = cfg.Section("general").Key("mailCounter").MustInt(10)
+	durationCounter = cfg.Section("general").Key("duration").MustInt64(60)
+	mailCounter = cfg.Section("general").Key("mailCounter").MustInt(10)
 	*DEBUG = cfg.Section("general").Key("BOOL").MustBool(true)
 
 	/* connect db and load blacklist database if necessary */
@@ -229,8 +230,8 @@ func load_config() {
 	}
 
 	if *DEBUG == true {
-		fmt.Printf("Loaded Duration %d\n", *durationCounter)
-		fmt.Printf("Loaded Max Mails per Duration %d\n", *mailCounter)
+		fmt.Printf("Loaded Duration %d\n", durationCounter)
+		fmt.Printf("Loaded Max Mails per Duration %d\n", mailCounter)
 	}
 
 }
@@ -245,12 +246,12 @@ func main() {
 	var wg sync.WaitGroup
 
 	/* Create send mail and policy-connector  */
-	if *RunSendmail == true {
-		go listenPort(&wg, handleSendmailConnection, *hostPortSendmail)
+	if *RunSendmailProtect == true {
+		go listenPort(&wg, handleSendmailConnection, *listenPortSendmail)
 		wg.Add(1)
 	}
-	if *RunSASLpolicy == true {
-		go listenPort(&wg, handlePolicyConnection, *hostPortPolicy)
+	if *RunSASLpolicyd == true {
+		go listenPort(&wg, handlePolicyConnection, *listenPortPolicy)
 		wg.Add(1)
 	}
 
