@@ -9,8 +9,8 @@ import (
 	_ "database/sql/driver"
 	"flag"
 	"fmt"
+	"github.com/go-ini/ini"
 	_ "github.com/mattn/go-sqlite3"
-	"log"
 	"net"
 	"os"
 	"runtime"
@@ -20,13 +20,15 @@ import (
 	"unicode/utf8"
 )
 
-/* Defaults, allow mailCounter in durationCounter */
+/* Defaults, allow mailCounter in durationCounter, can be overwritten by config file */
+var DEBUG = flag.Bool("debug", false, "Debug outputs")
 var hostPortSendmail = flag.String("bindSendmail", "localhost:9443", "ip and port for the listening socket for sendmail auth user requests")
 var hostPortPolicy = flag.String("bindPolicy", "localhost:8443", "ip and port for the listening socket for policy-connections")
 var mailCounter = flag.Int("c", 10, "allowed numbers of mail during duration")
 var durationCounter = flag.Int64("t", 60, "duration for the allowed number of mails")
 var RunSendmail = flag.Bool("rm", false, "Run Sendmail policy")
 var RunSASLpolicy = flag.Bool("rs", false, "Run SASL policyd")
+var configFile = flag.String("config", "postfixauthsasl.ini", "path to our configuration")
 
 /* String Formats */
 var postfixOkFmt string = "200 OK (%d)\n"
@@ -46,6 +48,9 @@ var uMC = make(map[string][]time.Time)
 /* sMC = staticMailCounters read by sql driver */
 var sMC = make(map[string]int)
 
+/* blacklistedsenderDomains = blacklistDomains read by sql driver */
+var bMC = make(map[string]bool)
+
 func handleUserLimit(userHost string) string {
 	var personalMailLimit int
 	mu.Lock()
@@ -61,7 +66,7 @@ func handleUserLimit(userHost string) string {
 
 	fmt.Println(userHost)
 	personalMailLimit = *mailCounter
-	_, ok  := sMC[userHost]
+	_, ok := sMC[userHost]
 	if ok == true {
 		personalMailLimit = sMC[userHost]
 		fmt.Println("found user " + userHost)
@@ -141,9 +146,7 @@ func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
 	defer wg.Done()
 
 	ln, err := net.Listen("tcp", AddrPort)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkErr(err)
 
 	defer ln.Close()
 	for {
@@ -156,12 +159,34 @@ func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
 	}
 }
 
-func scanUserLimits() {
-	/* open connection to db */
-	db, err := sql.Open("sqlite3", "./ratepolicy.db")
+func load_blacklist(dbsection map[string]string) {
+	db, err := sql.Open(dbsection["driver"], dbsection["dsn"])
+	defer db.Close()
+
 	checkErr(err)
 
-	rows, err := db.Query("SELECT sasl_username, sasl_limit FROM rate_sasl_user_limits")
+	rows, err := db.Query(dbsection["q"])
+	checkErr(err)
+	for rows.Next() {
+		var domain string
+		err = rows.Scan(&domain)
+		checkErr(err)
+		bMC[domain] = true
+	}
+
+	if *DEBUG == true {
+		fmt.Println("Loaded blacklisted domains")
+		fmt.Println(bMC)
+	}
+}
+
+func load_userlimits(dbsection map[string]string) {
+	db, err := sql.Open(dbsection["driver"], dbsection["dsn"])
+	defer db.Close()
+
+	checkErr(err)
+
+	rows, err := db.Query(dbsection["q"])
 	checkErr(err)
 	for rows.Next() {
 		var sasl_username string
@@ -170,15 +195,54 @@ func scanUserLimits() {
 		checkErr(err)
 		sMC[sasl_username] = sasl_limit
 	}
-	db.Close()
+
+	if *DEBUG == true {
+		fmt.Println("Loaded user limits")
+		fmt.Println(sMC)
+	}
+
+}
+
+func load_config() {
+	/* Load configuration file */
+	cfg, err := ini.Load(*configFile)
+	checkErr(err)
+
+	*durationCounter = cfg.Section("general").Key("duration").MustInt64(60)
+	*mailCounter = cfg.Section("general").Key("mailCounter").MustInt(10)
+	*DEBUG = cfg.Section("general").Key("BOOL").MustBool(true)
+
+	/* connect db and load blacklist database if necessary */
+	hash := cfg.Section("blacklist_db").KeysHash()
+	if val, ok := hash["enabled"]; ok {
+		if val == "1" {
+			load_blacklist(hash)
+		}
+	}
+
+	/* connect db and load blacklist database if necessary */
+	hash = cfg.Section("userlimit_db").KeysHash()
+	if val, ok := hash["enabled"]; ok {
+		if val == "1" {
+			load_userlimits(hash)
+		}
+	}
+
+	if *DEBUG == true {
+		fmt.Printf("Loaded Duration %d\n", *durationCounter)
+		fmt.Printf("Loaded Max Mails per Duration %d\n", *mailCounter)
+	}
+
+}
+
+func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	flag.Parse()
+	load_config()
 }
 
 func main() {
-	runtime.GOMAXPROCS(2)
 	var wg sync.WaitGroup
-
-	flag.Parse()
-	scanUserLimits()
 
 	/* Create send mail and policy-connector  */
 	if *RunSendmail == true {
