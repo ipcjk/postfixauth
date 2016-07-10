@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/go-ini/ini"
+	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/mattn/go-sqlite3"
 	"net"
 	"os"
@@ -22,7 +23,7 @@ import (
 
 /* Flags and argv parser */
 var DEBUG = flag.Bool("debug", false, "Debug outputs")
-var configFile = flag.String("config", "postfixauthsasl.ini", "path to our configuration")
+var configFile = flag.String("config", "postfixprotect.ini", "path to our configuration")
 var listenPortSendmail = flag.String("bindSendmail", "localhost:9443", "ip and port for the listening socket for sendmail auth user requests")
 var listenPortPolicy = flag.String("bindPolicy", "localhost:8443", "ip and port for the listening socket for policy-connections")
 var RunSendmailProtect = flag.Bool("sendmailprotect", false, "Run Sendmail policyd")
@@ -38,6 +39,7 @@ var postfixErrFmt string = "500 Limit reached\n"
 var postfixDefaultFmt string = "DUNNO default\n"
 var postfixPolicyUsername = "sasl_username="
 var postfixPolicyRequest = "request="
+var postfixPolicySender = "sender="
 
 /* Mutex for map-access */
 var mu sync.Mutex
@@ -50,6 +52,11 @@ var sMC = make(map[string]int)
 
 /* blacklisted senderDomains = blacklistDomains read by sql driver */
 var bMC = make(map[string]bool)
+
+/* to be implemented */
+func challengeSender(sender string) bool {
+	return false
+}
 
 func handleUserLimit(userHost string) string {
 	var personalMailLimit int
@@ -69,12 +76,11 @@ func handleUserLimit(userHost string) string {
 	if ok == true {
 		personalMailLimit = sMC[userHost]
 		if *DEBUG == true {
-			fmt.Println("found user " + userHost)
-			fmt.Printf("Setting limit to %d\n", personalMailLimit)
+			fmt.Printf("(%s)->limit(%d)\n", userHost, personalMailLimit)
 		}
 	}
 
-	if len(uMC[userHost]) > personalMailLimit {
+	if len(uMC[userHost]) >= personalMailLimit {
 		return fmt.Sprintf(postfixErrFmt)
 	} else {
 		uMC[userHost] = append(uMC[userHost], time.Now())
@@ -84,6 +90,8 @@ func handleUserLimit(userHost string) string {
 
 func handlePolicyConnection(pConn net.Conn) {
 	var sasl_username string
+	var policy_sender string
+
 	sawRequest := false
 
 	defer pConn.Close()
@@ -98,7 +106,8 @@ func handlePolicyConnection(pConn net.Conn) {
 	for scanner.Scan() {
 		if strings.HasPrefix(scanner.Text(), postfixPolicyRequest) {
 			sawRequest = true
-			continue
+		} else if strings.HasPrefix(scanner.Text(), postfixPolicySender) {
+			policy_sender = strings.Trim(scanner.Text(), postfixPolicySender)
 		} else if strings.HasPrefix(scanner.Text(), postfixPolicyUsername) {
 			sasl_username = strings.Trim(scanner.Text(), postfixPolicyUsername)
 		} else if utf8.RuneCountInString(scanner.Text()) == 0 {
@@ -106,7 +115,19 @@ func handlePolicyConnection(pConn net.Conn) {
 		}
 	}
 
-	if sawRequest == true && utf8.RuneCountInString(sasl_username) > 0 {
+	if sawRequest == false {
+		fmt.Fprint(pConn, postfixDefaultFmt)
+		return
+	}
+
+	if utf8.RuneCountInString(policy_sender) > 0 {
+		if challengeSender(policy_sender) == true {
+			fmt.Fprint(pConn, postfixErrFmt)
+			return
+		}
+	}
+
+	if utf8.RuneCountInString(sasl_username) > 0 {
 		fmt.Fprint(pConn, handleUserLimit(sasl_username+"@"+host))
 		return
 	}
@@ -160,48 +181,12 @@ func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
 	}
 }
 
-func load_blacklist(section map[string]string) {
-	db, err := sql.Open(section["driver"], section["dsn"])
+func read_db_callback(dbconnection map[string]string, parseSQL func(sql.Rows)) {
+	db, err := sql.Open(dbconnection["driver"], dbconnection["dsn"])
 	defer db.Close()
-
+	rows, err := db.Query(dbconnection["q"])
 	checkErr(err)
-
-	rows, err := db.Query(section["q"])
-	checkErr(err)
-	for rows.Next() {
-		var domain string
-		err = rows.Scan(&domain)
-		checkErr(err)
-		bMC[domain] = true
-	}
-
-	if *DEBUG == true {
-		fmt.Println("Loaded blacklisted domains")
-		fmt.Println(bMC)
-	}
-}
-
-func load_userlimits(section map[string]string) {
-	db, err := sql.Open(section["driver"], section["dsn"])
-	defer db.Close()
-
-	checkErr(err)
-
-	rows, err := db.Query(section["q"])
-	checkErr(err)
-	for rows.Next() {
-		var sasl_username string
-		var sasl_limit int
-		err = rows.Scan(&sasl_username, &sasl_limit)
-		checkErr(err)
-		sMC[sasl_username] = sasl_limit
-	}
-
-	if *DEBUG == true {
-		fmt.Println("Loaded user limits")
-		fmt.Println(sMC)
-	}
-
+	parseSQL(*rows)
 }
 
 func load_config() {
@@ -209,31 +194,52 @@ func load_config() {
 	cfg, err := ini.Load(*configFile)
 	checkErr(err)
 
-	durationCounter = cfg.Section("general").Key("duration").MustInt64(60)
-	mailCounter = cfg.Section("general").Key("mailCounter").MustInt(10)
-	*DEBUG = cfg.Section("general").Key("debug").MustBool(true)
+	durationCounter = cfg.Section("postfixprotect").Key("duration").MustInt64(60)
+	mailCounter = cfg.Section("postfixprotect").Key("mailCounter").MustInt(10)
+	*DEBUG = cfg.Section("postfixprotect").Key("debug").MustBool(true)
 
 	/* connect db and load blacklist database if necessary */
-	hash := cfg.Section("blacklist_db").KeysHash()
-	if val, ok := hash["enabled"]; ok {
+	section := cfg.Section("blacklists").KeysHash()
+	if val, ok := section["enabled"]; ok {
 		if val == "1" {
-			load_blacklist(hash)
+			read_db_callback(section, func(r sql.Rows) {
+				for r.Next() {
+					var domain string
+					err := r.Scan(&domain)
+					checkErr(err)
+					bMC[domain] = true
+				}
+				if *DEBUG == true {
+					fmt.Println("[blacklisted domains]")
+					fmt.Println(bMC)
+				}
+			})
 		}
 	}
 
 	/* connect db and load blacklist database if necessary */
-	hash = cfg.Section("userlimit_db").KeysHash()
-	if val, ok := hash["enabled"]; ok {
+	section = cfg.Section("users").KeysHash()
+	if val, ok := section["enabled"]; ok {
 		if val == "1" {
-			load_userlimits(hash)
+			read_db_callback(section, func(r sql.Rows) {
+				for r.Next() {
+					var sasl_username string
+					var sasl_limit int
+					err := r.Scan(&sasl_username, &sasl_limit)
+					checkErr(err)
+					sMC[sasl_username] = sasl_limit
+				}
+				if *DEBUG == true {
+					fmt.Println("[limits]")
+					fmt.Println(sMC)
+				}
+			})
 		}
 	}
 
 	if *DEBUG == true {
-		fmt.Printf("Loaded Duration %d\n", durationCounter)
-		fmt.Printf("Loaded Max Mails per Duration %d\n", mailCounter)
+		fmt.Printf("[tries] %d per %d seconds\n", mailCounter, durationCounter)
 	}
-
 }
 
 func init() {
