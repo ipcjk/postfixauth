@@ -14,9 +14,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"net"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unicode/utf8"
 )
@@ -203,7 +205,7 @@ func read_db_callback(dbconnection map[string]string, parseSQL func(sql.Rows)) {
 }
 
 func load_config() {
-	/* Load configuration file */
+	/* Load / reload configuration file */
 	cfg, err := ini.Load(*configFile)
 	checkErr(err)
 
@@ -262,8 +264,21 @@ func init() {
 	load_config()
 }
 
+func cleanupUsers() {
+
+}
+
 func main() {
 	var wg sync.WaitGroup
+	configReload := make(chan os.Signal, 1)
+	signal.Notify(configReload, syscall.SIGHUP)
+
+	/* Reload configurations and limits on SIGHUP */
+	go func() {
+		for _ = range configReload {
+			load_config()
+		}
+	}()
 
 	/* Create send mail and policy-connector  */
 	if *RunSendmailProtect == true {
