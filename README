@@ -10,7 +10,7 @@ cd postfixprotect
 make
 
 running with defaults)
-./postfixauth -sendmailprotect -saslprotect
+./postfixprotect -sendmailprotect -saslprotect
 
 command line parameters:
 - bind => ip and port for socket
