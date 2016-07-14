@@ -24,19 +24,21 @@ import (
 /* Flags and argv parser */
 var DEBUG = flag.Bool("debug", false, "Debug outputs")
 var configFile = flag.String("config", "postfixprotect.ini", "path to our configuration")
-var listenPortSendmail = flag.String("bindSendmail", "localhost:9443", "ip and port for the listening socket for sendmail auth user requests")
-var listenPortPolicy = flag.String("bindPolicy", "localhost:8443", "ip and port for the listening socket for policy-connections")
+var listenPortSendmail = flag.String("bindSendmail", "localhost:8443", "ip and port for the listening socket for sendmail auth user requests")
+var listenPortPolicy = flag.String("bindPolicy", "localhost:9443", "ip and port for the listening socket for policy-connections")
 var RunSendmailProtect = flag.Bool("sendmailprotect", false, "Run Sendmail policyd")
 var RunSASLpolicyd = flag.Bool("saslprotect", false, "Run SASL policyd")
 
 /* Globals */
 var mailCounter int
 var durationCounter int64
+var timeoutClient int
 
 /* Postfix strings */
-var postfixOkFmt string = "200 OK (%d)\n"
-var postfixErrFmt string = "500 Limit reached\n"
-var postfixDefaultFmt string = "DUNNO default\n"
+var postfixOkFmt = "200 OK (%d)\n"
+var postfixErrFmt = "500 Limit reached\n"
+var postfixTimeout = "451 Timeout client\n"
+var postfixDefaultFmt = "DUNNO default\n"
 var postfixPolicyUsername = "sasl_username="
 var postfixPolicyRequest = "request="
 var postfixPolicySender = "sender="
@@ -101,8 +103,15 @@ func handlePolicyConnection(pConn net.Conn) {
 		fmt.Println("Cant read ip and port", err.Error())
 		return
 	}
-	/* Fix, we need a timeout for closing hanging connections
+	/* We need a timeout for closing hanging connections
 	 */
+	go func() {
+		select {
+		case <-time.After(time.Second * time.Duration(timeoutClient)):
+			fmt.Fprint(pConn, postfixTimeout)
+			pConn.Close()
+		}
+	}()
 
 	scanner := bufio.NewScanner(pConn)
 	for scanner.Scan() {
@@ -115,6 +124,11 @@ func handlePolicyConnection(pConn net.Conn) {
 		} else if utf8.RuneCountInString(scanner.Text()) == 0 {
 			break
 		}
+	}
+
+	if scanner.Err() != nil {
+		fmt.Println("Timeout: ", scanner.Err())
+		return
 	}
 
 	if sawRequest == false {
@@ -195,6 +209,7 @@ func load_config() {
 
 	durationCounter = cfg.Section("postfixprotect").Key("duration").MustInt64(60)
 	mailCounter = cfg.Section("postfixprotect").Key("mailCounter").MustInt(10)
+	timeoutClient = cfg.Section("postfixprotect").Key("timeoutClient").MustInt(10)
 	*DEBUG = cfg.Section("postfixprotect").Key("debug").MustBool(true)
 
 	/* connect db and load blacklist database if necessary */

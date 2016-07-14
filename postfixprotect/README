@@ -1,0 +1,59 @@
+/ Copyright © 2016 Jörg Kost, joerg.kost@gmx.com
+// License: https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+postfixprotect(user) limits the access to postfix sendmail-routine and
+sasl-smtp-auth senders by checking the rate of sent emails in a
+given timeperiod.
+
+building)
+go build postfixprotectgo.go
+
+running with defaults)
+./postfixauth
+
+command line parameters:
+- bind => ip and port for socket
+- sendmailprotect => run sendmail
+- saslprotect => run sasl protection
+
+setup postfix configuration for sendmail protection:
+
+You need tell postfix to connect to the socket and ask for the sending permission.
+E.g. on my systems I use something like this:
+
+postconf -e "authorized_submit_users = tcp:localhost:8443"
+postconf -e "authorized_mailq_users = root, nagios, postfix"
+postconf -e "authorized_flush_users = root, nagios, postfix"
+
+This will also limit access to the mailq-commands.
+
+setup postfix configuration for sasl sender protection:
+
+For the sasl protection you need to add a clause with host and port to your
+restriction limits, e.g.
+
+smtpd_recipient_restrictions = check_policy_service inet:[127.0.0.1]:9443, ...
+
+central usage)
+postfixprotect can run on a central network machine and therefore will build a
+map with a key concating the user-name and the clients ip addresses.
+
+background)
+The program currently does not daemonize itself, so you may want start it
+with nohup, a systemd starter file, screen, supervisord.
+
+It is also lazy and only purges old map entries, when the user is sending more
+mails.
+
+try out)
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+web87@my01:~$ /usr/sbin/sendmail -t jk@myself
+postdrop: fatal: User web87(1467) is not allowed to submit mail
+
+mail.log:
+Jun 20 07:45:12 my01 postfix/postdrop[5611]: fatal: User web87(1431) is not allowed to submit mail
+
