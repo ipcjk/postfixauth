@@ -31,7 +31,7 @@ var mu sync.Mutex
 /* uMC = userMailCounter */
 var uMC = make(map[string][]time.Time)
 
-func handleConnection(pConn net.Conn)  {
+func handleConnection(pConn net.Conn) {
 	defer pConn.Close()
 
 	user, err := bufio.NewReader(pConn).ReadString('\n')
@@ -41,9 +41,9 @@ func handleConnection(pConn net.Conn)  {
 	}
 
 	user = strings.TrimSuffix(user, "\n")
-	user = strings.TrimPrefix(user, "get ");
+	user = strings.TrimPrefix(user, "get ")
 
-	if utf8.RuneCountInString(user) == 0  {
+	if utf8.RuneCountInString(user) == 0 {
 		fmt.Fprint(pConn, postfixErrFmt)
 		return
 	}
