@@ -106,8 +106,10 @@ func handlePolicyConnection(pConn net.Conn) {
 		fmt.Println("Cant read ip and port", err.Error())
 		return
 	}
-	/* We need a timeout for closing hanging connections
+
+	/* We need start a timeout for hanging policy requets
 	 */
+
 	go func() {
 		select {
 		case <-thisIsEnd:
@@ -137,20 +139,25 @@ func handlePolicyConnection(pConn net.Conn) {
 		goto cleanup
 	}
 
-	if sawRequest == false {
-		fmt.Fprint(pConn, postfixDefaultFmt)
+	/* If we did not see the request pattern or no sasl_username, we dont need to
+	 * waste any more cpu time
+	 */
+	if sawRequest == false || utf8.RuneCountInString(sasl_username) == 0 {
+		fmt.Println("NO SASL USERNAME")
+		goto returnDefault
+	}
+
+	/* If we saw a sender address, check this for blacklisting */
+	if utf8.RuneCountInString(policy_sender) > 0 && challengeSender(policy_sender) == true {
+		fmt.Fprint(pConn, postfixErrFmt)
 		goto cleanup
 	}
 
-	if utf8.RuneCountInString(sasl_username) > 0 && utf8.RuneCountInString(policy_sender) > 0 {
-		if challengeSender(policy_sender) == true {
-			fmt.Fprint(pConn, postfixErrFmt)
-			goto cleanup
-		}
-		fmt.Fprint(pConn, handleUserLimit(sasl_username+"@"+host))
-		goto cleanup
-	}
+	/* Everything fine till here? Then validate the limit */
+	fmt.Fprint(pConn, handleUserLimit(sasl_username+"@"+host))
+	goto cleanup
 
+returnDefault:
 	fmt.Fprint(pConn, postfixDefaultFmt)
 
 cleanup:
@@ -282,7 +289,7 @@ func main() {
 
 	/* Reload configurations and limits on SIGHUP */
 	go func() {
-		for _ = range configReload {
+		for range configReload {
 			load_config()
 		}
 	}()
