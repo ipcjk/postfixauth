@@ -14,9 +14,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"net"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unicode/utf8"
 )
@@ -93,6 +95,7 @@ func handleUserLimit(userHost string) string {
 func handlePolicyConnection(pConn net.Conn) {
 	var sasl_username string
 	var policy_sender string
+	var thisIsEnd = make(chan struct{})
 
 	sawRequest := false
 
@@ -107,9 +110,12 @@ func handlePolicyConnection(pConn net.Conn) {
 	 */
 	go func() {
 		select {
+		case <-thisIsEnd:
+			return
 		case <-time.After(time.Second * time.Duration(timeoutClient)):
 			fmt.Fprint(pConn, postfixTimeout)
 			pConn.Close()
+			thisIsEnd <- struct{}{}
 		}
 	}()
 
@@ -127,25 +133,28 @@ func handlePolicyConnection(pConn net.Conn) {
 	}
 
 	if scanner.Err() != nil {
-		fmt.Println("Timeout: ", scanner.Err())
-		return
+		fmt.Println("Timeout receiving data: ", scanner.Err())
+		goto cleanup
 	}
 
 	if sawRequest == false {
 		fmt.Fprint(pConn, postfixDefaultFmt)
-		return
+		goto cleanup
 	}
 
 	if utf8.RuneCountInString(sasl_username) > 0 && utf8.RuneCountInString(policy_sender) > 0 {
 		if challengeSender(policy_sender) == true {
 			fmt.Fprint(pConn, postfixErrFmt)
-			return
+			goto cleanup
 		}
 		fmt.Fprint(pConn, handleUserLimit(sasl_username+"@"+host))
-		return
+		goto cleanup
 	}
 
 	fmt.Fprint(pConn, postfixDefaultFmt)
+
+cleanup:
+	thisIsEnd <- struct{}{}
 	return
 }
 
@@ -203,7 +212,7 @@ func read_db_callback(dbconnection map[string]string, parseSQL func(sql.Rows)) {
 }
 
 func load_config() {
-	/* Load configuration file */
+	/* Load / reload configuration file */
 	cfg, err := ini.Load(*configFile)
 	checkErr(err)
 
@@ -262,8 +271,21 @@ func init() {
 	load_config()
 }
 
+func cleanupUsers() {
+
+}
+
 func main() {
 	var wg sync.WaitGroup
+	configReload := make(chan os.Signal, 1)
+	signal.Notify(configReload, syscall.SIGHUP)
+
+	/* Reload configurations and limits on SIGHUP */
+	go func() {
+		for _ = range configReload {
+			load_config()
+		}
+	}()
 
 	/* Create send mail and policy-connector  */
 	if *RunSendmailProtect == true {
@@ -275,7 +297,6 @@ func main() {
 		wg.Add(1)
 	}
 
-	/* Wait for both threads to end */
 	wg.Wait()
 	os.Exit(0)
 }
