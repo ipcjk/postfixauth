@@ -45,13 +45,13 @@ var postfixPolicySender = "sender="
 var mu sync.Mutex
 
 /* uMC = userMailCounter */
-var uMC = make(map[string][]time.Time)
+var currentMailByUser = make(map[string][]time.Time)
 
 /* sMC = staticMailCounters read by sql driver */
-var sMC = make(map[string]int)
+var limitMailByUser = make(map[string]int)
 
 /* blacklisted senderDomains = blacklistDomains read by sql driver */
-var bMC = make(map[string]bool)
+var blacklistDomains = make(map[string]bool)
 
 /* to be implemented */
 func challengeSender(sender string) bool {
@@ -63,28 +63,28 @@ func handleUserLimit(userHost string) string {
 	mu.Lock()
 	newSlice := make([]time.Time, 0, 15)
 
-	for i := 0; i < len(uMC[userHost]); i++ {
-		if int64(time.Since(uMC[userHost][i])/time.Second) < durationCounter {
-			newSlice = append(newSlice, uMC[userHost][i])
+	for i := 0; i < len(currentMailByUser[userHost]); i++ {
+		if int64(time.Since(currentMailByUser[userHost][i])/time.Second) < durationCounter {
+			newSlice = append(newSlice, currentMailByUser[userHost][i])
 		}
 	}
-	uMC[userHost] = newSlice
+	currentMailByUser[userHost] = newSlice
 	mu.Unlock()
 
 	personalMailLimit = mailCounter
-	_, ok := sMC[userHost]
+	_, ok := limitMailByUser[userHost]
 	if ok == true {
-		personalMailLimit = sMC[userHost]
+		personalMailLimit = limitMailByUser[userHost]
 		if *DEBUG == true {
 			fmt.Printf("(%s)->limit(%d)\n", userHost, personalMailLimit)
 		}
 	}
 
-	if len(uMC[userHost]) >= personalMailLimit {
+	if len(currentMailByUser[userHost]) >= personalMailLimit {
 		return fmt.Sprintf(postfixErrFmt)
 	} else {
-		uMC[userHost] = append(uMC[userHost], time.Now())
-		return fmt.Sprintf(postfixOkFmt, len(uMC[userHost]))
+		currentMailByUser[userHost] = append(currentMailByUser[userHost], time.Now())
+		return fmt.Sprintf(postfixOkFmt, len(currentMailByUser[userHost]))
 	}
 }
 
@@ -101,6 +101,8 @@ func handlePolicyConnection(pConn net.Conn) {
 		fmt.Println("Cant read ip and port", err.Error())
 		return
 	}
+	/* Fix, we need a timeout for closing hanging connections
+	 */
 
 	scanner := bufio.NewScanner(pConn)
 	for scanner.Scan() {
@@ -120,14 +122,11 @@ func handlePolicyConnection(pConn net.Conn) {
 		return
 	}
 
-	if utf8.RuneCountInString(policy_sender) > 0 {
+	if utf8.RuneCountInString(sasl_username) > 0 && utf8.RuneCountInString(policy_sender) > 0 {
 		if challengeSender(policy_sender) == true {
 			fmt.Fprint(pConn, postfixErrFmt)
 			return
 		}
-	}
-
-	if utf8.RuneCountInString(sasl_username) > 0 {
 		fmt.Fprint(pConn, handleUserLimit(sasl_username+"@"+host))
 		return
 	}
@@ -207,11 +206,11 @@ func load_config() {
 					var domain string
 					err := r.Scan(&domain)
 					checkErr(err)
-					bMC[domain] = true
+					blacklistDomains[domain] = true
 				}
 				if *DEBUG == true {
 					fmt.Println("[blacklisted domains]")
-					fmt.Println(bMC)
+					fmt.Println(blacklistDomains)
 				}
 			})
 		}
@@ -227,11 +226,11 @@ func load_config() {
 					var sasl_limit int
 					err := r.Scan(&sasl_username, &sasl_limit)
 					checkErr(err)
-					sMC[sasl_username] = sasl_limit
+					limitMailByUser[sasl_username] = sasl_limit
 				}
 				if *DEBUG == true {
 					fmt.Println("[limits]")
-					fmt.Println(sMC)
+					fmt.Println(limitMailByUser)
 				}
 			})
 		}
