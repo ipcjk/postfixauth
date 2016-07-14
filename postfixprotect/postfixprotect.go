@@ -34,7 +34,7 @@ var RunSASLpolicyd = flag.Bool("saslprotect", false, "Run SASL policyd")
 /* Globals */
 var mailCounter int
 var durationCounter int64
-var timeoutClient int
+var timeoutPolicyCheck int
 
 /* Postfix strings */
 var postfixOkFmt = "200 OK (%d)\n"
@@ -108,13 +108,15 @@ func handlePolicyConnection(pConn net.Conn) {
 	}
 
 	/* We need start a timeout for hanging policy requets
+	 * timeoutPolicyCheck will set a limit for the WHOLE transaction (db-lookup,
+	 * blacklistCheck ... , so please be gentle!
 	 */
 
 	go func() {
 		select {
 		case <-thisIsEnd:
 			return
-		case <-time.After(time.Second * time.Duration(timeoutClient)):
+		case <-time.After(time.Second * time.Duration(timeoutPolicyCheck)):
 			fmt.Fprint(pConn, postfixTimeout)
 			pConn.Close()
 			thisIsEnd <- struct{}{}
@@ -143,7 +145,6 @@ func handlePolicyConnection(pConn net.Conn) {
 	 * waste any more cpu time
 	 */
 	if sawRequest == false || utf8.RuneCountInString(sasl_username) == 0 {
-		fmt.Println("NO SASL USERNAME")
 		goto returnDefault
 	}
 
@@ -225,7 +226,7 @@ func load_config() {
 
 	durationCounter = cfg.Section("postfixprotect").Key("duration").MustInt64(60)
 	mailCounter = cfg.Section("postfixprotect").Key("mailCounter").MustInt(10)
-	timeoutClient = cfg.Section("postfixprotect").Key("timeoutClient").MustInt(10)
+	timeoutPolicyCheck = cfg.Section("postfixprotect").Key("timeoutPolicyCheck").MustInt(10)
 	*DEBUG = cfg.Section("postfixprotect").Key("debug").MustBool(true)
 
 	/* connect db and load blacklist database if necessary */
