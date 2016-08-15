@@ -108,7 +108,7 @@ func handlePolicyConnection(pConn net.Conn) {
 		return
 	}
 
-	/* We need start a timeout for hanging policy requets
+	/* We need start a timeout for hanging policy requests
 	 * timeoutPolicyCheck will set a limit for the WHOLE transaction (db-lookup,
 	 * blacklistCheck ... , so please be gentle!
 	 */
@@ -138,31 +138,34 @@ func handlePolicyConnection(pConn net.Conn) {
 	}
 
 	if scanner.Err() != nil {
-		fmt.Println("Timeout receiving data: ", scanner.Err())
-		goto cleanup
+		// fmt.Println("Timeout receiving data: ", scanner.Err())
+		goto closeConnection
 	}
 
 	/* If we did not see the request pattern or no sasl_username, we dont need to
 	 * waste any more cpu time
 	 */
 	if sawRequest == false || utf8.RuneCountInString(sasl_username) == 0 {
-		goto returnDefault
+		goto returnDefaultThenHandleNextRequest
 	}
 
 	/* If we saw a sender address, check this for blacklisting */
 	if utf8.RuneCountInString(policy_sender) > 0 && challengeSender(policy_sender) == true {
 		fmt.Fprint(pConn, postfixErrFmt)
-		goto cleanup
+		goto handleNextRequest
 	}
 
 	/* Everything fine till here? Then validate the limit */
 	fmt.Fprint(pConn, handleUserLimit(sasl_username+"@"+host))
-	goto cleanup
+	goto handleNextRequest
 
-returnDefault:
+returnDefaultThenHandleNextRequest:
 	fmt.Fprint(pConn, postfixDefaultFmt)
 
-cleanup:
+handleNextRequest:
+	handlePolicyConnection(pConn)
+
+closeConnection:
 	thisIsEnd <- struct{}{}
 	return
 }
