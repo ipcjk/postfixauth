@@ -65,6 +65,8 @@ func challengeSender(sender string) bool {
 func handleUserLimit(userHost string) string {
 	var personalMailLimit int
 	mu.Lock()
+	defer mu.Unlock()
+
 	newSlice := make([]time.Time, 0, 15)
 
 	for i := 0; i < len(currentMailByUser[userHost]); i++ {
@@ -73,7 +75,6 @@ func handleUserLimit(userHost string) string {
 		}
 	}
 	currentMailByUser[userHost] = newSlice
-	mu.Unlock()
 
 	personalMailLimit = mailCounter
 	_, ok := limitMailByUser[userHost]
@@ -85,7 +86,7 @@ func handleUserLimit(userHost string) string {
 	}
 
 	if len(currentMailByUser[userHost]) >= personalMailLimit {
-		return fmt.Sprintf(postfixErrFmt)
+		return postfixErrFmt
 	} else {
 		currentMailByUser[userHost] = append(currentMailByUser[userHost], time.Now())
 		return fmt.Sprintf(postfixOkFmt, len(currentMailByUser[userHost]))
@@ -196,6 +197,7 @@ func handleSendmailConnection(pConn net.Conn) {
 
 func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
 	defer wg.Done()
+	counter := 0
 
 	ln, err := net.Listen("tcp", AddrPort)
 	checkErr(err)
@@ -206,6 +208,8 @@ func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
 		if err != nil {
 			fmt.Println("Could not accept client", err.Error())
 		} else {
+			counter++
+			fmt.Printf("Accept %d \n", counter)
 			go Handler(conn)
 		}
 	}
