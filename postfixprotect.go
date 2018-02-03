@@ -1,4 +1,4 @@
-// Copyright © 2016 Jörg Kost, joerg.kost@gmx.com
+// Copyright © 2018 Jörg Kost, joerg.kost@gmx.com
 // License: https://creativecommons.org/licenses/by-nc-sa/4.0/
 
 package main
@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/gops/agent"
 )
 
 /* Some globals */
@@ -56,7 +58,6 @@ func challengeSender(sender string) bool {
 
 func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
 	defer wg.Done()
-	counter := 0
 
 	ln, err := net.Listen("tcp", AddrPort)
 	checkErr(err)
@@ -67,7 +68,6 @@ func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
 		if err != nil {
 			fmt.Println("Could not accept client", err.Error())
 		} else {
-			counter++
 			go Handler(conn)
 		}
 	}
@@ -77,6 +77,10 @@ func main() {
 	var wg sync.WaitGroup
 
 	flag.Parse()
+
+	if err := agent.Listen(agent.Options{}); err != nil {
+		log.Fatal(err)
+	}
 
 	/* Load our txt files */
 	loadBlacklist()
@@ -116,6 +120,7 @@ func loadLimits() {
 		}
 		limitMailByUser[fields[0]] = limit
 	}
+
 }
 
 func loadBlacklist() {

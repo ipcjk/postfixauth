@@ -10,8 +10,7 @@ import (
 )
 
 func handlePolicyConnection(pConn net.Conn) {
-	var saslUsername string
-	var policySender string
+	var saslUsername, policySender string
 	var thisIsEnd = make(chan struct{})
 
 	sawRequest := false
@@ -62,18 +61,15 @@ func handlePolicyConnection(pConn net.Conn) {
 	/* If we saw a sender address, check this for blacklisting */
 	if utf8.RuneCountInString(policySender) > 0 && challengeSender(policySender) == true {
 		fmt.Fprint(pConn, postfixErrFmt)
-		goto handleNextRequest
+		goto closeConnection
 	}
 
 	/* Everything fine till here? Then validate the limit */
 	fmt.Fprint(pConn, handleUserLimit(saslUsername))
-	goto handleNextRequest
+	goto closeConnection
 
 returnDefaultThenHandleNextRequest:
 	fmt.Fprint(pConn, postfixDefaultFmt)
-
-handleNextRequest:
-	handlePolicyConnection(pConn)
 
 closeConnection:
 	thisIsEnd <- struct{}{}

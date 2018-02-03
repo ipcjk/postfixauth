@@ -1,4 +1,4 @@
-/ Copyright © 2016 Jörg Kost, joerg.kost@gmx.com
+/ Copyright © 2018 Jörg Kost, joerg.kost@gmx.com
 // License: https://creativecommons.org/licenses/by-nc-sa/4.0/
 
 postfixprotect limits the access to postfix sendmail-routine and
