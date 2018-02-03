@@ -14,8 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/google/gops/agent"
 )
 
 /* Some globals */
@@ -79,10 +77,6 @@ func main() {
 	var wg sync.WaitGroup
 
 	flag.Parse()
-
-	if err := agent.Listen(agent.Options{}); err != nil {
-		log.Fatal(err)
-	}
 
 	/* Load our txt files */
 	loadBlacklist()
