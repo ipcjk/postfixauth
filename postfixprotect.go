@@ -31,8 +31,10 @@ var timeoutPolicyCheck = flag.Int("timeout", 30, "timeout waiting for handle the
 /* Postfix strings */
 var postfixOkFmt = "200 OK (%d)\n"
 var postfixErrFmt = "500 Limit reached\n"
-var postfixTimeout = "451 Timeout client\n"
-var postfixDefaultFmt = "DUNNO default\n"
+var postfixTimeout = "action=451 Timeout client\n"
+var postfixPolicyReject = "action=500 Limit reached\n\n"
+var postfixPolicyBlackListReject = "action=500 Sender blacklisted\n\n"
+var postfixPolicyDefaultFmt = "action=DUNNO\n\n"
 var postfixPolicyUsername = "sasl_username="
 var postfixPolicyRequest = "request="
 var postfixPolicySender = "sender="

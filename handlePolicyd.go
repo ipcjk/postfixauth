@@ -60,16 +60,18 @@ func handlePolicyConnection(pConn net.Conn) {
 
 	/* If we saw a sender address, check this for blacklisting */
 	if utf8.RuneCountInString(policySender) > 0 && challengeSender(policySender) == true {
-		fmt.Fprint(pConn, postfixErrFmt)
+		fmt.Fprint(pConn, postfixPolicyBlackListReject)
 		goto closeConnection
 	}
 
 	/* Everything fine till here? Then validate the limit */
-	fmt.Fprint(pConn, handleUserLimit(saslUsername))
-	goto closeConnection
+	if !isUserInLimit(saslUsername) {
+		fmt.Fprint(pConn, postfixPolicyReject)
+		goto closeConnection
+	}
 
 returnDefaultThenHandleNextRequest:
-	fmt.Fprint(pConn, postfixDefaultFmt)
+	fmt.Fprint(pConn, postfixPolicyDefaultFmt)
 
 closeConnection:
 	thisIsEnd <- struct{}{}

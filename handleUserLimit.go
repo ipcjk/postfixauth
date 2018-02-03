@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func handleUserLimit(userHost string) string {
+func isUserInLimit(userHost string) bool {
 	var personalMailLimit int
 	mu.Lock()
 	defer mu.Unlock()
@@ -25,9 +25,9 @@ func handleUserLimit(userHost string) string {
 	}
 
 	if len(currentMailByUser[userHost]) >= personalMailLimit {
-		return postfixErrFmt
+		return false
 	}
 
 	currentMailByUser[userHost] = append(currentMailByUser[userHost], time.Now())
-	return fmt.Sprintf(postfixOkFmt, len(currentMailByUser[userHost]))
+	return true
 }

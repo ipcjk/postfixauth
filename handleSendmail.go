@@ -31,7 +31,13 @@ func handleSendmailConnection(pConn net.Conn) {
 		return
 	}
 
-	fmt.Fprint(pConn, handleUserLimit(user+"@"+host))
+	/* Everything fine till here? Then validate the limit */
+	if !isUserInLimit(user + "@" + host) {
+		fmt.Fprint(pConn, postfixErrFmt)
+		return
+	}
+
+	fmt.Fprint(pConn, postfixOkFmt)
 	return
 
 }
