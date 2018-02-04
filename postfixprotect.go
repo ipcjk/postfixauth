@@ -22,7 +22,7 @@ var listenPortSendmail = flag.String("bindSendmail", "localhost:8443", "ip and p
 var listenPortPolicy = flag.String("bindPolicy", "localhost:9443", "ip and port for the listening socket for policy-connections")
 var runSendmailProtect = flag.Bool("sendmailprotect", false, "Run Sendmail policyd")
 var runSASLpolicyd = flag.Bool("saslprotect", true, "Run SASL policyd")
-var durationCounter = flag.Int64("duration", 60, "default duration for mailCounters")
+var durationCounter = flag.Int("duration", 60, "default duration for mailCounters")
 var mailCounter = flag.Int("mailcounter", 25, "default mailcounter till blocking in duration")
 var timeoutPolicyCheck = flag.Int("timeout", 30, "timeout waiting for handle the client connection")
 
@@ -37,6 +37,12 @@ var postfixPolicyUsername = "sasl_username="
 var postfixPolicyRequest = "request="
 var postfixPolicySender = "sender="
 
+/* Record for user limits */
+type userLimit struct {
+	personalLimit           int
+	personalDurationCounter int
+}
+
 /* Mutex for map-access */
 var mu sync.Mutex
 
@@ -44,7 +50,7 @@ var mu sync.Mutex
 var currentMailByUser = make(map[string][]time.Time)
 
 /* sMC = staticMailCounters read by txt file */
-var limitMailByUser = make(map[string]int)
+var limitMailByUser = make(map[string]userLimit)
 
 /* blacklisted senderDomains = blacklistDomains read by txt file
 to be implemented
@@ -105,18 +111,33 @@ func loadLimits() {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
+
+		if strings.HasPrefix(scanner.Text(), "#") {
+			continue
+		}
+
 		fields := strings.Fields(scanner.Text())
-		if len(fields) != 2 {
+		if len(fields) != 3 {
 			continue
 		}
 
 		limit, err := strconv.Atoi(fields[1])
 		if err != nil {
+			limit = *mailCounter
 			continue
 		}
-		limitMailByUser[fields[0]] = limit
-	}
 
+		duration, err := strconv.Atoi(fields[2])
+		if err != nil {
+			/* take default if err condition */
+			duration = *durationCounter
+		}
+
+		limitMailByUser[fields[0]] = userLimit{
+			personalDurationCounter: duration,
+			personalLimit:           limit,
+		}
+	}
 }
 
 func loadBlacklist() {

@@ -7,20 +7,28 @@ import (
 
 func isUserInLimit(userHost string) bool {
 	var personalMailLimit int
+	var personalDurationLimit int
+
 	mu.Lock()
 	defer mu.Unlock()
 
-	for i := 0; i < len(currentMailByUser[userHost]); i++ {
-		if int64(time.Since(currentMailByUser[userHost][i])/time.Second) > *durationCounter {
-			currentMailByUser[userHost] = append(currentMailByUser[userHost][:i], currentMailByUser[userHost][i+1])
-		}
+	/* Set defaults for limits from command line parameters */
+	personalDurationLimit = *durationCounter
+	personalMailLimit = *mailCounter
+
+	/* Check if user exist and overwrite settings */
+	if _, ok := limitMailByUser[userHost]; ok {
+		personalMailLimit = limitMailByUser[userHost].personalLimit
+		personalDurationLimit = limitMailByUser[userHost].personalDurationCounter
 	}
 
-	personalMailLimit = *mailCounter
-	if _, ok := limitMailByUser[userHost]; ok {
-		personalMailLimit = limitMailByUser[userHost]
-		if *debug == true {
-			fmt.Printf("(%s)->limit(%d)\n", userHost, personalMailLimit)
+	if *debug == true {
+		fmt.Printf("(%s)->limit(%d)->duration(%d)\n", userHost, personalMailLimit, personalDurationLimit)
+	}
+
+	for i := 0; i < len(currentMailByUser[userHost]); i++ {
+		if int(time.Since(currentMailByUser[userHost][i])/time.Second) > personalDurationLimit {
+			currentMailByUser[userHost] = append(currentMailByUser[userHost][:i], currentMailByUser[userHost][i+1])
 		}
 	}
 
