@@ -1,4 +1,4 @@
-#user limit timeframe
-web3 10
-web555 5
+#user limit durationtime in second
+web3 10 100
+web555 5 60
 ich@google.com 10
