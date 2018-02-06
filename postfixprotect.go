@@ -22,8 +22,8 @@ var listenPortSendmail = flag.String("bindSendmail", "localhost:8443", "ip and p
 var listenPortPolicy = flag.String("bindPolicy", "localhost:9443", "ip and port for the listening socket for policy-connections")
 var runSendmailProtect = flag.Bool("sendmailprotect", false, "Run Sendmail policyd")
 var runSASLpolicyd = flag.Bool("saslprotect", true, "Run SASL policyd")
-var durationCounter = flag.Int("duration", 60, "default duration for mailCounters")
-var mailCounter = flag.Int("mailcounter", 25, "default mailcounter till blocking in duration")
+var durationCounter = flag.Int("duration", 600, "default duration for mailCounters")
+var mailCounter = flag.Int("mailcounter", 30, "default mailcounter till blocking in duration")
 var timeoutPolicyCheck = flag.Int("timeout", 30, "timeout waiting for handle the client connection")
 
 /* Postfix strings */
