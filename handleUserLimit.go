@@ -26,11 +26,15 @@ func isUserInLimit(userHost string) bool {
 		fmt.Printf("(%s)->limit(%d)->duration(%d)\n", userHost, personalMailLimit, personalDurationLimit)
 	}
 
+	/* build up new slice with new time entries */
+	var newCurrentMails = make([]time.Time, 0, len(currentMailByUser[userHost]))
 	for i := 0; i < len(currentMailByUser[userHost]); i++ {
-		if int(time.Since(currentMailByUser[userHost][i])/time.Second) > personalDurationLimit {
-			currentMailByUser[userHost] = append(currentMailByUser[userHost][:i], currentMailByUser[userHost][i+1])
+		if int(time.Since(currentMailByUser[userHost][i])/time.Second) < personalDurationLimit {
+			newCurrentMails = append(newCurrentMails, currentMailByUser[userHost][i])
 		}
 	}
+	currentMailByUser[userHost] = nil
+	currentMailByUser[userHost] = newCurrentMails
 
 	if len(currentMailByUser[userHost]) >= personalMailLimit {
 		return false
