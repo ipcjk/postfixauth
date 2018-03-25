@@ -38,9 +38,9 @@ func handlePolicyConnection(pConn net.Conn) {
 		if strings.HasPrefix(scanner.Text(), postfixPolicyRequest) {
 			sawRequest = true
 		} else if strings.HasPrefix(scanner.Text(), postfixPolicySender) {
-			policySender = strings.Trim(scanner.Text(), postfixPolicySender)
+			policySender = strings.TrimPrefix(scanner.Text(), postfixPolicySender)
 		} else if strings.HasPrefix(scanner.Text(), postfixPolicyUsername) {
-			saslUsername = strings.Trim(scanner.Text(), postfixPolicyUsername)
+			saslUsername = strings.TrimPrefix(scanner.Text(), postfixPolicyUsername)
 		} else if utf8.RuneCountInString(scanner.Text()) == 0 {
 			break
 		}

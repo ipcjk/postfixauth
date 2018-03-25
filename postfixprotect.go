@@ -121,6 +121,12 @@ func loadLimits() {
 			continue
 		}
 
+		if *debug {
+			fmt.Print("DEBUG")
+			fmt.Println(fields)
+		}
+
+
 		limit, err := strconv.Atoi(fields[1])
 		if err != nil {
 			limit = *mailCounter
