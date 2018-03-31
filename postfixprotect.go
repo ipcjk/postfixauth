@@ -27,7 +27,7 @@ var mailCounter = flag.Int("mailcounter", 30, "default mailcounter till blocking
 var timeoutPolicyCheck = flag.Int("timeout", 30, "timeout waiting for handle the client connection")
 
 /* Postfix strings */
-var postfixOkFmt = "200 OK (%d)\n"
+var postfixOkFmt = "200 OK\n"
 var postfixErrFmt = "500 Limit reached\n"
 var postfixTimeout = "action=451 Timeout client\n"
 var postfixPolicyReject = "action=500 Limit reached\n\n"

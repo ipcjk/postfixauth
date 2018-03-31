@@ -11,12 +11,6 @@ import (
 func handleSendmailConnection(pConn net.Conn) {
 	defer pConn.Close()
 
-	host, _, err := net.SplitHostPort(pConn.RemoteAddr().String())
-	if err != nil {
-		fmt.Println("Cant read ip and port", err.Error())
-		return
-	}
-
 	user, err := bufio.NewReader(pConn).ReadString('\n')
 	if err != nil {
 		fmt.Println("Cant read user", err.Error())
@@ -32,7 +26,7 @@ func handleSendmailConnection(pConn net.Conn) {
 	}
 
 	/* Everything fine till here? Then validate the limit */
-	if !isUserInLimit(user + "@" + host) {
+	if !isUserInLimit(user) {
 		fmt.Fprint(pConn, postfixErrFmt)
 		return
 	}
