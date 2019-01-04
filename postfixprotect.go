@@ -139,7 +139,9 @@ func loadLimits() {
 			duration = *durationCounter
 		}
 
-		limitMailByUser[fields[0]] = userLimit{
+		userHost := strings.ToLower(fields[0])
+
+		limitMailByUser[userHost] = userLimit{
 			personalDurationCounter: duration,
 			personalLimit:           limit,
 		}

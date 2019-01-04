@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
 func isUserInLimit(userHost string) bool {
 	var personalMailLimit int
 	var personalDurationLimit int
+	userHost = strings.ToLower(userHost)
 
 	mu.Lock()
 	defer mu.Unlock()
