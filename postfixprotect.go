@@ -18,7 +18,7 @@ import (
 
 /* Some globals */
 var debug = flag.Bool("debug", false, "Debug outputs")
-var listenPortSendmail = flag.String("bindSendmail", "localhost:8443", "ip and port for the listening socket for sendmail auth user requests")
+var listenPortSendmail = flag.String("bindSendmail", "localhost:9444", "ip and port for the listening socket for sendmail auth user requests")
 var listenPortPolicy = flag.String("bindPolicy", "localhost:9443", "ip and port for the listening socket for policy-connections")
 var runSendmailProtect = flag.Bool("sendmailprotect", false, "Run Sendmail policyd")
 var runSASLpolicyd = flag.Bool("saslprotect", true, "Run SASL policyd")

@@ -5,7 +5,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/postfixprotect/postfixprotect
+ExecStart=/usr/local/postfixprotect/postfixprotect -sendmailprotect
 WorkingDirectory=/usr/local/postfixprotect
 User=postfix
 Group=postfix
