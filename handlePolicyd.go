@@ -59,13 +59,13 @@ func handlePolicyConnection(pConn net.Conn) {
 	}
 
 	/* If we saw a sender address, check this for blacklisting */
-	if utf8.RuneCountInString(policySender) > 0 && challengeSender(policySender) == true {
+	if utf8.RuneCountInString(policySender) > 0 && challengeSender(policySender) {
 		fmt.Fprint(pConn, postfixPolicyBlackListReject)
 		goto closeConnection
 	}
 
 	/* Everything fine till here? Then validate the limit */
-	if !isUserInLimit(saslUsername) {
+	if !isUserInLimit(saslUsername,*durationCounter,*mailCounter) {
 		fmt.Fprint(pConn, postfixPolicyReject)
 		goto closeConnection
 	}

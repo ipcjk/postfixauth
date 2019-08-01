@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func isUserInLimit(userHost string) bool {
+func isUserInLimit(userHost string, defaultDuration int, defaultCounter int) bool {
 	var personalMailLimit int
 	var personalDurationLimit int
 	userHost = strings.ToLower(userHost)
@@ -15,8 +15,8 @@ func isUserInLimit(userHost string) bool {
 	defer mu.Unlock()
 
 	/* Set defaults for limits from command line parameters */
-	personalDurationLimit = *durationCounter
-	personalMailLimit = *mailCounter
+	personalDurationLimit = defaultDuration
+	personalMailLimit = defaultCounter
 
 	/* Check if user exist and overwrite settings */
 	if _, ok := limitMailByUser[userHost]; ok {

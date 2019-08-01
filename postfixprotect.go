@@ -25,6 +25,7 @@ var runSASLpolicyd = flag.Bool("saslprotect", true, "Run SASL policyd")
 var durationCounter = flag.Int("duration", 600, "default duration for mailCounters")
 var mailCounter = flag.Int("mailcounter", 30, "default mailcounter till blocking in duration")
 var timeoutPolicyCheck = flag.Int("timeout", 30, "timeout waiting for handle the client connection")
+var mailCounterSendmail = flag.Int("mailcountersendmail", 5, "default limit for mails send over the postfix pickup process")
 
 /* Postfix strings */
 var postfixOkFmt = "200 OK\n"
@@ -59,6 +60,7 @@ var blacklistDomains = make(map[string]bool)
 
 /* to be implemented */
 func challengeSender(sender string) bool {
+
 	return false
 }
 
