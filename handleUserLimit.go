@@ -24,7 +24,7 @@ func isUserInLimit(userHost string, defaultDuration int, defaultCounter int) boo
 		personalDurationLimit = limitMailByUser[userHost].personalDurationCounter
 	}
 
-	if *debug  {
+	if *debug {
 		fmt.Printf("(%s)->limit(%d)->duration(%d)\n", userHost, personalMailLimit, personalDurationLimit)
 	}
 

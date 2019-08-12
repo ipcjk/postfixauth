@@ -38,7 +38,7 @@ func handlePolicyConnection(pConn net.Conn) {
 		if strings.HasPrefix(scanner.Text(), postfixPolicyRequest) {
 			sawRequest = true
 		} else if strings.HasPrefix(scanner.Text(), postfixPolicySender) {
-			policySender = strings.TrimPrefix(scanner.Text(), postfixPolicySender)
+			policySender = strings.TrimPrefix(strings.ToLower(scanner.Text()), postfixPolicySender)
 		} else if strings.HasPrefix(scanner.Text(), postfixPolicyUsername) {
 			saslUsername = strings.TrimPrefix(scanner.Text(), postfixPolicyUsername)
 		} else if utf8.RuneCountInString(scanner.Text()) == 0 {
@@ -59,13 +59,13 @@ func handlePolicyConnection(pConn net.Conn) {
 	}
 
 	/* If we saw a sender address, check this for blacklisting */
-	if utf8.RuneCountInString(policySender) > 0 && challengeSender(policySender) {
+	if utf8.RuneCountInString(policySender) > 0 && challengeSender(policySender) != nil {
 		fmt.Fprint(pConn, postfixPolicyBlackListReject)
 		goto closeConnection
 	}
 
 	/* Everything fine till here? Then validate the limit */
-	if !isUserInLimit(saslUsername,*durationCounter,*mailCounter) {
+	if !isUserInLimit(saslUsername, *durationCounter, *mailCounterPolicyd) {
 		fmt.Fprint(pConn, postfixPolicyReject)
 		goto closeConnection
 	}
