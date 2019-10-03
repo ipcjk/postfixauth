@@ -64,6 +64,12 @@ func handlePolicyConnection(pConn net.Conn) {
 		goto closeConnection
 	}
 
+	/* If we saw a sasl_username, check this for blacklisting */
+	if utf8.RuneCountInString(saslUsername) > 0 && challengeSender(saslUsername) != nil {
+		fmt.Fprint(pConn, postfixPolicyBlackListReject)
+		goto closeConnection
+	}
+
 	/* Everything fine till here? Then validate the limit */
 	if !isUserInLimit(saslUsername, *durationCounter, *mailCounterPolicyd) {
 		fmt.Fprint(pConn, postfixPolicyReject)

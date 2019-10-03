@@ -35,7 +35,7 @@ var timeoutPolicyCheck = flag.Int("timeout", 30, "timeout waiting for handle the
 var whiteListMode = flag.Bool("whitelistmode", false, "only allow senders in the whitelist configuration file to send mail")
 var whiteListFile = flag.String("whitelist", "virtusertable", "whitelist senders")
 var limitsFile = flag.String("limits", "limits.txt", "limits file")
-var blackListFile = flag.String("blacklist", "blacklist.txt", "whitelist senders")
+var blackListFile = flag.String("blacklist", "blacklist.txt", "blacklisted sender")
 
 /* Postfix strings */
 var postfixOkFmt = "200 OK\n"
