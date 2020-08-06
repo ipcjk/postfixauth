@@ -28,7 +28,7 @@ var runSASLpolicyd = flag.Bool("saslprotect", true, "Run SASL policyd")
 /* default variables for our counters */
 var durationCounter = flag.Int("duration", 600, "default duration for mailCounters")
 var mailCounterPolicyd = flag.Int("mailcounter", 30, "default mailcounter till blocking in duration")
-var mailCounterSendmail = flag.Int("mailcountersendmail", 8, "default limit for mails send over the postfix pickup process")
+var mailCounterSendmail = flag.Int("mailcountersendmail", 2, "default limit for mails send over the postfix pickup process")
 var timeoutPolicyCheck = flag.Int("timeout", 30, "timeout waiting for handle the client connection")
 
 /* whitelist files and enable booleans */
