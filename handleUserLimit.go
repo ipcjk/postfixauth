@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func isUserInLimit(userHost string, defaultDuration int, defaultCounter int) (bool, int, int) {
+func isUserInLimit(userHost string, defaultDuration int, defaultCounter int) (bool, int, int, int) {
 	var personalMailLimit int
 	var personalDurationLimit int
 	userHost = strings.ToLower(userHost)
@@ -39,9 +39,9 @@ func isUserInLimit(userHost string, defaultDuration int, defaultCounter int) (bo
 	currentMailByUser[userHost] = newCurrentMails
 
 	if len(currentMailByUser[userHost]) >= personalMailLimit {
-		return false, personalMailLimit, personalDurationLimit
+		return false, personalMailLimit, personalDurationLimit, len(currentMailByUser[userHost])
 	}
 
 	currentMailByUser[userHost] = append(currentMailByUser[userHost], time.Now())
-	return true, personalMailLimit, personalDurationLimit
+	return true, personalMailLimit, personalDurationLimit, len(currentMailByUser[userHost])
 }

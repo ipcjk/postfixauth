@@ -13,7 +13,7 @@ func handlePolicyConnection(pConn net.Conn) {
 	var saslUsername, policySender string
 	var thisIsEnd = make(chan struct{})
 	var allowed bool
-	var personalLimit, personalDuration int
+	var personalLimit, personalDuration, lenUserLimit int
 
 	sawRequest := false
 
@@ -73,9 +73,9 @@ func handlePolicyConnection(pConn net.Conn) {
 	}
 
 	/* Everything fine till here? Then validate the limit */
-	allowed, personalLimit, personalDuration = isUserInLimit(saslUsername, *durationCounter, *mailCounterPolicyd)
+	allowed, personalLimit, personalDuration, lenUserLimit = isUserInLimit(saslUsername, *durationCounter, *mailCounterPolicyd)
 	if !allowed {
-		fmt.Fprintf(pConn, postfixPolicyReject, personalLimit, personalDuration)
+		fmt.Fprintf(pConn, postfixPolicyReject, personalLimit, personalDuration, lenUserLimit)
 		goto closeConnection
 	}
 

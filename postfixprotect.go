@@ -41,7 +41,7 @@ var blackListFile = flag.String("blacklist", "blacklist.txt", "blacklisted sende
 var postfixOkFmt = "200 OK\n"
 var postfixErrFmt = "500 Limit reached\n"
 var postfixTimeout = "action=451 Timeout client\n"
-var postfixPolicyReject = "action=500 Limit reached. Sie haben das aktuelle Versandlimit für Ihren Zugang erreicht. " + "Sie dürfen %d Mails in %d Sekunden parallel verschicken. Im Zweifel, wenden Sie sich bitte an den Support.\n\n"
+var postfixPolicyReject = "action=500 Limit reached. Sie haben das aktuelle Versandlimit für Ihren Zugang erreicht. " + "Sie dürfen %d Mails in %d Sekunden parallel verschicken, Sie haben allerdings %d bereits versendet. Im Zweifel, wenden Sie sich bitte an den Support.\n\n"
 var postfixPolicyBlackListReject = "action=500 Sender blacklisted\n\n"
 var postfixPolicyDefaultFmt = "action=DUNNO\n\n"
 var postfixPolicyUsername = "sasl_username="
