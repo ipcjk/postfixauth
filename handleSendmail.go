@@ -9,6 +9,9 @@ import (
 )
 
 func handleSendmailConnection(pConn net.Conn) {
+	var allowed bool
+	var personalLimit, personalDuration int
+
 	defer pConn.Close()
 
 	user, err := bufio.NewReader(pConn).ReadString('\n')
@@ -26,8 +29,9 @@ func handleSendmailConnection(pConn net.Conn) {
 	}
 
 	/* Everything fine till here? Then validate the limit */
-	if !isUserInLimit(user, *durationCounter, *mailCounterSendmail) {
-		fmt.Fprint(pConn, postfixErrFmt)
+	allowed, personalLimit, personalDuration = isUserInLimit(user, *durationCounter, *mailCounterSendmail)
+	if !allowed {
+		fmt.Fprintf(pConn, postfixPolicyReject, personalLimit, personalDuration)
 		return
 	}
 
