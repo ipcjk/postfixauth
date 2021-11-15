@@ -10,7 +10,6 @@ import (
 
 func handleSendmailConnection(pConn net.Conn) {
 	var allowed bool
-	var personalLimit, personalDuration, lenUserLimit int
 
 	defer pConn.Close()
 
@@ -29,9 +28,9 @@ func handleSendmailConnection(pConn net.Conn) {
 	}
 
 	/* Everything fine till here? Then validate the limit */
-	allowed, personalLimit, personalDuration, lenUserLimit = isUserInLimit(user, *durationCounter, *mailCounterSendmail)
+	allowed, _, _, _ = isUserInLimit(user, *durationCounter, *mailCounterSendmail)
 	if !allowed {
-		fmt.Fprintf(pConn, postfixPolicyReject, personalLimit, personalDuration, lenUserLimit)
+		fmt.Fprintf(pConn, postfixErrFmt)
 		return
 	}
 
