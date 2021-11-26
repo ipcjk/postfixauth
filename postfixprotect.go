@@ -10,9 +10,11 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -117,6 +119,10 @@ func listenPort(wg *sync.WaitGroup, Handler func(net.Conn), AddrPort string) {
 func main() {
 	var wg sync.WaitGroup
 
+	signalChanel := make(chan os.Signal, 1)
+	signal.Notify(signalChanel, syscall.SIGUSR1)
+
+	/* parsse flag  */
 	flag.Parse()
 
 	/* Load our txt files */
@@ -133,6 +139,21 @@ func main() {
 		go listenPort(&wg, handleSendmailConnection, *listenPortSendmail)
 		wg.Add(1)
 	}
+
+	go func() {
+		s := <-signalChanel
+		switch s {
+		case syscall.SIGUSR1:
+			log.Println("Benutzerliste mit Limits")
+			for users := range limitMailByUser {
+				log.Println(users, limitMailByUser[users].personalLimit, limitMailByUser[users].personalDurationCounter)
+			}
+			log.Println("Aktuelle Limits und Zustellversuche:")
+			for limits := range currentMailByUser {
+				log.Println(limits, len(currentMailByUser[limits]), currentMailByUser[limits])
+			}
+		}
+	}()
 
 	wg.Wait()
 	os.Exit(0)

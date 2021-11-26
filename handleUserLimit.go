@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -25,7 +25,7 @@ func isUserInLimit(userHost string, defaultDuration int, defaultCounter int) (bo
 	}
 
 	if *debug {
-		fmt.Printf("(%s)->limit(%d)->duration(%d)\n", userHost, personalMailLimit, personalDurationLimit)
+		log.Println("(%s)->limit(%d)->duration(%d)\n", userHost, personalMailLimit, personalDurationLimit)
 	}
 
 	/* build up new slice with new time entries */
