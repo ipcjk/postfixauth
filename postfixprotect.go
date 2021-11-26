@@ -141,16 +141,18 @@ func main() {
 	}
 
 	go func() {
-		s := <-signalChanel
-		switch s {
-		case syscall.SIGUSR1:
-			log.Println("Benutzerliste mit Limits")
-			for users := range limitMailByUser {
-				log.Println(users, limitMailByUser[users].personalLimit, limitMailByUser[users].personalDurationCounter)
-			}
-			log.Println("Aktuelle Limits und Zustellversuche:")
-			for limits := range currentMailByUser {
-				log.Println(limits, len(currentMailByUser[limits]), currentMailByUser[limits])
+		for {
+			s := <-signalChanel
+			switch s {
+			case syscall.SIGUSR1:
+				log.Println("Benutzerliste mit Limits")
+				for users := range limitMailByUser {
+					log.Println(users, limitMailByUser[users].personalLimit, limitMailByUser[users].personalDurationCounter)
+				}
+				log.Println("Aktuelle Limits und Zustellversuche:")
+				for limits := range currentMailByUser {
+					log.Println(limits, len(currentMailByUser[limits]), currentMailByUser[limits])
+				}
 			}
 		}
 	}()
