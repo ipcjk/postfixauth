@@ -38,7 +38,7 @@ func isUserInLimit(userHost string, defaultDuration int, defaultCounter int) (bo
 	currentMailByUser[userHost] = nil
 	currentMailByUser[userHost] = newCurrentMails
 
-	if len(currentMailByUser[userHost]) >= personalMailLimit {
+	if len(currentMailByUser[userHost]) > personalMailLimit {
 		return false, personalMailLimit, personalDurationLimit, len(currentMailByUser[userHost])
 	}
 
