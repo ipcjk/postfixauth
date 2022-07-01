@@ -13,9 +13,10 @@ func isSenderGreyListed(sender, recipient string) bool {
 	content := sender + "\\###\\" + recipient
 
 	hash := sha256.New()
+	key := hex.EncodeToString(hash.Sum([]byte(content)))
 
-	if _, ok := greyListTracker[hex.EncodeToString(hash.Sum([]byte(content)))]; !ok {
-		greyListTracker[sender+"\\###\\"+recipient] = true
+	if _, ok := greyListTracker[key]; !ok {
+		greyListTracker[key] = true
 		return false
 	}
 
