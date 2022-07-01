@@ -1,10 +1,30 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"log"
 	"strings"
 	"time"
 )
+
+func isSenderGreyListed(sender, recipient string) bool {
+
+	content := sender + "\\###\\" + recipient
+
+	hash := sha256.New()
+
+	if _, ok := greyListTracker[hex.EncodeToString(hash.Sum([]byte(content)))]; !ok {
+		greyListTracker[sender+"\\###\\"+recipient] = true
+		return false
+	}
+
+	if *debug {
+		log.Println("Found entry for", sender, recipient)
+	}
+
+	return true
+}
 
 func isUserInLimit(userHost string, defaultDuration int, defaultCounter int) (bool, int, int, int) {
 	var personalMailLimit int
@@ -25,7 +45,7 @@ func isUserInLimit(userHost string, defaultDuration int, defaultCounter int) (bo
 	}
 
 	if *debug {
-		log.Println("(%s)->limit(%d)->duration(%d)\n", userHost, personalMailLimit, personalDurationLimit)
+		log.Printf("(%s)->limit(%d)->duration(%d)\n", userHost, personalMailLimit, personalDurationLimit)
 	}
 
 	/* build up new slice with new time entries */

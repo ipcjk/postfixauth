@@ -10,7 +10,7 @@ import (
 )
 
 func handlePolicyConnection(pConn net.Conn) {
-	var saslUsername, policySender string
+	var saslUsername, policySender, policyRecipient string
 	var thisIsEnd = make(chan struct{})
 	var allowed bool
 	var personalLimit, personalDuration, lenUserLimit int
@@ -43,6 +43,8 @@ func handlePolicyConnection(pConn net.Conn) {
 			policySender = strings.TrimPrefix(strings.ToLower(scanner.Text()), postfixPolicySender)
 		} else if strings.HasPrefix(scanner.Text(), postfixPolicyUsername) {
 			saslUsername = strings.TrimPrefix(scanner.Text(), postfixPolicyUsername)
+		} else if strings.HasPrefix(scanner.Text(), postfixPolicyRecipient) {
+			policyRecipient = strings.TrimPrefix(strings.ToLower(scanner.Text()), postfixPolicyRecipient)
 		} else if utf8.RuneCountInString(scanner.Text()) == 0 {
 			break
 		}
@@ -53,10 +55,23 @@ func handlePolicyConnection(pConn net.Conn) {
 		goto closeConnection
 	}
 
-	/* If we did not see the request pattern or no sasl_username, we dont need to
-	 * waste any more cpu time
-	 */
-	if sawRequest == false || utf8.RuneCountInString(saslUsername) == 0 {
+	/* did we a policy request? else bail out */
+	if sawRequest == false {
+		goto returnDefaultThenHandleNextRequest
+	}
+
+	/* greylisting enabled? */
+	if *greyListing && utf8.RuneCountInString(saslUsername) == 0 {
+		allowed = isSenderGreyListed(policySender, policyRecipient)
+		if !allowed {
+			fmt.Fprint(pConn, postfixGreyListing)
+			goto closeConnection
+		}
+		goto returnDefaultThenHandleNextRequest
+	}
+
+	/* SASL user? */
+	if utf8.RuneCountInString(saslUsername) == 0 {
 		goto returnDefaultThenHandleNextRequest
 	}
 
@@ -86,3 +101,4 @@ closeConnection:
 	thisIsEnd <- struct{}{}
 	return
 }
+

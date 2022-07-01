@@ -39,16 +39,22 @@ var whiteListFile = flag.String("whitelist", "virtusertable", "whitelist senders
 var limitsFile = flag.String("limits", "limits.txt", "limits file")
 var blackListFile = flag.String("blacklist", "blacklist.txt", "blacklisted sender")
 
+/* greylist or not */
+var greyListing = flag.Bool("greylisting", false, "apply greylisting in automode")
+var greyListFile = flag.String("greylist", "greylist.txt", "greylist-accounted sender")
+
 /* Postfix strings */
 var postfixOkFmt = "200 OK\n"
 var postfixErrFmt = "500 Limit reached\n"
-var postfixTimeout = "action=451 Timeout client\n"
+var postfixTimeout = "action=451 Timeout client\n\n"
+var postfixGreyListing = "action=451 Greylisting activated\n\n"
 var postfixPolicyReject = "action=500 Limit reached. Sie haben das aktuelle Versandlimit fuer Ihren Zugang erreicht. " + "Sie duerfen %d Mails in %d Sekunden parallel verschicken, Sie haben allerdings %d bereits versendet. Im Zweifel, wenden Sie sich bitte an den Support.\n\n"
 var postfixPolicyBlackListReject = "action=500 Sender blacklisted\n\n"
 var postfixPolicyDefaultFmt = "action=DUNNO\n\n"
 var postfixPolicyUsername = "sasl_username="
 var postfixPolicyRequest = "request="
 var postfixPolicySender = "sender="
+var postfixPolicyRecipient = "recipient="
 
 /* Record for user limits */
 type userLimit struct {
@@ -73,6 +79,9 @@ var blacklistSender = make(map[string]bool)
 /* whitelist that is read by e.g. postfix user configuration,
 e.g. tab seperated */
 var whitelistSender = make(map[string]bool)
+
+/* greylisting feature */
+var greyListTracker = make(map[string]bool)
 
 /* to be implemented */
 func challengeSender(sender string) error {
@@ -121,6 +130,8 @@ func main() {
 
 	signalChanel := make(chan os.Signal, 1)
 	signal.Notify(signalChanel, syscall.SIGUSR1)
+	signal.Notify(signalChanel, syscall.SIGTERM)
+	signal.Notify(signalChanel, syscall.SIGINT)
 
 	/* parsse flag  */
 	flag.Parse()
@@ -129,6 +140,9 @@ func main() {
 	loadBlacklist()
 	loadLimits()
 	loadSenders()
+	if *greyListing {
+		loadGreyList()
+	}
 
 	if *runSASLpolicyd == true {
 		go listenPort(&wg, handlePolicyConnection, *listenPortPolicy)
@@ -144,6 +158,12 @@ func main() {
 		for {
 			s := <-signalChanel
 			switch s {
+			case syscall.SIGTERM:
+				saveGreyList()
+				os.Exit(0)
+			case syscall.SIGINT:
+				saveGreyList()
+				os.Exit(0)
 			case syscall.SIGUSR1:
 				log.Println("Benutzerliste mit Limits")
 				for users := range limitMailByUser {
@@ -152,6 +172,10 @@ func main() {
 				log.Println("Aktuelle Limits und Zustellversuche:")
 				for limits := range currentMailByUser {
 					log.Println(limits, len(currentMailByUser[limits]), currentMailByUser[limits])
+				}
+				log.Println("Aktuelle Greylistings:")
+				for key := range greyListTracker {
+					log.Println(key, greyListTracker[key])
 				}
 			}
 		}
@@ -257,6 +281,41 @@ func loadBlacklist() {
 		fmt.Println("Blacklist", localblacklistSender)
 	}
 	blacklistSender = localblacklistSender
+}
+
+func loadGreyList() {
+	localGreyList := make(map[string]bool)
+
+	file, err := os.Open(*greyListFile)
+	if err != nil {
+		greyListTracker = localGreyList
+	}
+	file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		localGreyList[scanner.Text()] = true
+	}
+
+	if *debug {
+		fmt.Println("GreyList", localGreyList)
+	}
+	greyListTracker = localGreyList
+}
+
+func saveGreyList() {
+	if *greyListing {
+		log.Println("Saving")
+		/* submit to file */
+		file, err := os.OpenFile(*greyListFile, os.O_RDWR|os.O_CREATE, 0640)
+		if err != nil {
+			log.Println(err)
+		}
+		for key := range greyListTracker {
+			fmt.Fprintf(file, "%s\n", key)
+		}
+		file.Close()
+	}
 }
 
 func checkErr(err error) {
