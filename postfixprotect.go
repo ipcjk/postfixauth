@@ -290,7 +290,7 @@ func loadGreyList() {
 	if err != nil {
 		greyListTracker = localGreyList
 	}
-	file.Close()
+	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
