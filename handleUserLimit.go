@@ -10,6 +10,11 @@ import (
 
 func isSenderGreyListed(sender, recipient string) bool {
 
+	/* check if recipient is an exception */
+	if _, ok := greyListException[recipient]; ok {
+		return true
+	}
+
 	content := sender + "\\###\\" + recipient
 
 	hash := sha256.New()

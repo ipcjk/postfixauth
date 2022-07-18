@@ -42,6 +42,7 @@ var blackListFile = flag.String("blacklist", "blacklist.txt", "blacklisted sende
 /* greylist or not */
 var greyListing = flag.Bool("greylisting", false, "apply greylisting in automode")
 var greyListFile = flag.String("greylist", "greylist.txt", "greylist-accounted sender")
+var greyListExceptionFile = flag.String("greylistexception", "nogreylist.txt", "don't enforce greylist for this recipients")
 
 /* Postfix strings */
 var postfixOkFmt = "200 OK\n"
@@ -82,6 +83,9 @@ var whitelistSender = make(map[string]bool)
 
 /* greylisting feature */
 var greyListTracker = make(map[string]bool)
+
+/* greylisting exception */
+var greyListException = make(map[string]bool)
 
 /* to be implemented */
 func challengeSender(sender string) error {
@@ -133,7 +137,7 @@ func main() {
 	signal.Notify(signalChanel, syscall.SIGTERM)
 	signal.Notify(signalChanel, syscall.SIGINT)
 
-	/* parsse flag  */
+	/* parse flag  */
 	flag.Parse()
 
 	/* Load our txt files */
@@ -142,6 +146,7 @@ func main() {
 	loadSenders()
 	if *greyListing {
 		loadGreyList()
+		loadGreyListException()
 	}
 
 	if *runSASLpolicyd == true {
@@ -301,6 +306,27 @@ func loadGreyList() {
 		fmt.Println("GreyList", localGreyList)
 	}
 	greyListTracker = localGreyList
+}
+
+func loadGreyListException() {
+	localGreyListException := make(map[string]bool)
+
+	file, err := os.Open(*greyListExceptionFile)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		localGreyListException[scanner.Text()] = true
+	}
+
+	if *debug {
+		fmt.Println("GreyList-Exception", localGreyListException)
+	}
+	greyListException = localGreyListException
 }
 
 func saveGreyList() {
