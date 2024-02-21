@@ -10,6 +10,9 @@ import (
 
 func isSenderGreyListed(sender, recipient string) bool {
 
+	greyListMu.Lock()
+	defer greyListMu.Unlock()
+
 	/* check if recipient is an exception */
 	if _, ok := greyListException[recipient]; ok {
 		return true

@@ -65,6 +65,7 @@ type userLimit struct {
 
 /* Mutex for map-access */
 var mu sync.Mutex
+var greyListMu sync.Mutex
 
 /* uMC = userMailCounter */
 var currentMailByUser = make(map[string][]time.Time)
@@ -72,13 +73,18 @@ var currentMailByUser = make(map[string][]time.Time)
 /* sMC = staticMailCounters read by txt file */
 var limitMailByUser = make(map[string]userLimit)
 
-/* blacklisted senderDomains = blacklistSender read by txt file
+/*
+	blacklisted senderDomains = blacklistSender read by txt file
+
 to be implemented
 */
 var blacklistSender = make(map[string]bool)
 
-/* whitelist that is read by e.g. postfix user configuration,
-e.g. tab seperated */
+/*
+	whitelist that is read by e.g. postfix user configuration,
+
+e.g. tab seperated
+*/
 var whitelistSender = make(map[string]bool)
 
 /* greylisting feature */
@@ -104,7 +110,7 @@ func challengeSender(sender string) error {
 	}
 
 	/* no whitelist mode? then allow "any" address */
-	if ! *whiteListMode {
+	if !*whiteListMode {
 		return nil
 	}
 
@@ -291,6 +297,9 @@ func loadBlacklist() {
 func loadGreyList() {
 	localGreyList := make(map[string]bool)
 
+	greyListMu.Lock()
+	defer greyListMu.Unlock()
+
 	file, err := os.Open(*greyListFile)
 	if err != nil {
 		greyListTracker = localGreyList
@@ -311,6 +320,9 @@ func loadGreyList() {
 func loadGreyListException() {
 	localGreyListException := make(map[string]bool)
 
+	greyListMu.Lock()
+	defer greyListMu.Unlock()
+
 	file, err := os.Open(*greyListExceptionFile)
 	if err != nil {
 		log.Println(err)
@@ -330,6 +342,9 @@ func loadGreyListException() {
 }
 
 func saveGreyList() {
+	greyListMu.Lock()
+	defer greyListMu.Unlock()
+
 	if *greyListing {
 		log.Println("Saving")
 		/* submit to file */
